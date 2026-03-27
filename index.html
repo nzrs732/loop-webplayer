@@ -1311,6 +1311,11 @@
           <div class="status-dot" id="statusDot"></div>
           <span id="statusText">No video loaded</span>
         </div>
+        <div class="transport-divider"></div>
+        <div class="save-row">
+          <input type="text" id="sessionNameInput" placeholder="Session name…" />
+          <button class="btn-primary" onclick="saveSession()">Save session</button>
+        </div>
       </div>
 
       <!-- Row 2: Timeline -->
@@ -1361,16 +1366,10 @@
         </div>
       </div>
 
-      <!-- Row 4: Chapters + Save -->
-      <div class="bottom-footer">
-        <div class="chapter-section" id="chapterSection">
-          <span class="chapter-section-label">Chapters</span>
-          <div class="chapter-list" id="chapterList"></div>
-        </div>
-        <div class="save-row">
-          <input type="text" id="sessionNameInput" placeholder="Session name…" />
-          <button class="btn-primary" onclick="saveSession()">Save session</button>
-        </div>
+      <!-- Row 4: Chapters -->
+      <div class="chapter-section" id="chapterSection">
+        <span class="chapter-section-label">Chapters</span>
+        <div class="chapter-list" id="chapterList"></div>
       </div>
 
     </div>
