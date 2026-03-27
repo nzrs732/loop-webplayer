@@ -891,6 +891,115 @@
     }
     .recent-remove:hover { opacity: 1; color: var(--danger); }
 
+    /* ── Chapter markers on timeline ── */
+    .chapter-marker {
+      position: absolute;
+      top: 0;
+      width: 1px;
+      height: 100%;
+      background: rgba(255,255,255,0.25);
+      pointer-events: none;
+      transform: translateX(-50%);
+      z-index: 1;
+    }
+
+    .chapter-marker::before {
+      content: '';
+      position: absolute;
+      top: -4px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 5px;
+      height: 5px;
+      background: rgba(255,255,255,0.5);
+      border-radius: 50%;
+    }
+
+    /* ── Chapter list ── */
+    .chapter-section {
+      display: none;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .chapter-section.has-chapters { display: flex; }
+
+    .chapter-section-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-muted);
+    }
+
+    .chapter-list {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      padding-bottom: 2px;
+    }
+    .chapter-list::-webkit-scrollbar { height: 3px; }
+    .chapter-list::-webkit-scrollbar-track { background: transparent; }
+    .chapter-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .chapter-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 5px 8px 5px 10px;
+      white-space: nowrap;
+      flex-shrink: 0;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+    .chapter-pill:hover { border-color: #555; }
+
+    .chapter-pill-time {
+      font-size: 11px;
+      font-variant-numeric: tabular-nums;
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .chapter-pill-name {
+      font-size: 12px;
+      color: var(--text);
+      max-width: 160px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .chapter-pill-btns {
+      display: flex;
+      gap: 3px;
+      margin-left: 2px;
+    }
+
+    .chapter-pill-btns button {
+      font-size: 10px;
+      padding: 2px 7px;
+      border-radius: 10px;
+      line-height: 1.5;
+    }
+
+    .btn-set-a {
+      background: transparent;
+      border: 1px solid var(--success);
+      color: var(--success);
+      opacity: 0.75;
+    }
+    .btn-set-a:hover { opacity: 1; background: rgba(76,175,125,0.1); }
+
+    .btn-set-b {
+      background: transparent;
+      border: 1px solid #e07b55;
+      color: #e07b55;
+      opacity: 0.75;
+    }
+    .btn-set-b:hover { opacity: 1; background: rgba(224,123,85,0.1); }
+
     /* ── Divider ── */
     .divider {
       height: 1px;
@@ -1207,6 +1316,7 @@
           <div class="timeline" id="timeline">
             <div class="tl-track-bg"></div>
             <div class="tl-track-fill" id="trackFill"></div>
+            <div id="chapterMarkers"></div>
             <div class="tl-playhead" id="playhead"></div>
             <input type="range" id="startSlider" min="0" max="100" value="0" step="0.1" oninput="onStartSlide()" />
             <input type="range" id="endSlider" min="0" max="100" value="100" step="0.1" oninput="onEndSlide()" />
@@ -1215,6 +1325,12 @@
             <span id="tlStart">0:00</span>
             <span id="tlDuration">—</span>
           </div>
+        </div>
+
+        <!-- Chapter list -->
+        <div class="chapter-section" id="chapterSection">
+          <span class="chapter-section-label">Chapters</span>
+          <div class="chapter-list" id="chapterList"></div>
         </div>
 
         <!-- A / B cards -->
@@ -1292,6 +1408,13 @@
     getFirestore, collection, addDoc, getDocs,
     deleteDoc, doc, query, where, serverTimestamp
   } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+  // ─────────────────────────────────────────────
+  // 🔧 YouTube Data API key (for chapter fetching)
+  // Get one: console.cloud.google.com → Enable "YouTube Data API v3" → Create API Key
+  // Restrict it to your domain for safety
+  // ─────────────────────────────────────────────
+  const YOUTUBE_API_KEY = ''; // ← paste your key here
 
   // ─────────────────────────────────────────────
   // 🔧 REPLACE WITH YOUR FIREBASE CONFIG
@@ -1504,7 +1627,6 @@
 
   function onPlayerReady(e) {
     videoDuration = player.getDuration();
-    // Only reset loop points if they haven't been set by loadSession
     if (startSec === 0 && endSec === 0) {
       startSec = 0;
       endSec = videoDuration;
@@ -1515,6 +1637,7 @@
     updateDisplays();
     updateStatus();
     startLoopWatcher();
+    fetchChapters(currentVideoId);
   }
 
   function onPlayerStateChange(e) {
@@ -1778,6 +1901,7 @@
         updateDisplays();
         updateStatus();
         startLoopWatcher();
+        renderChapterMarkers(currentChapters);
         clearInterval(t);
       }
     }, 200);
@@ -1814,6 +1938,98 @@
     el.className = 'show ' + type;
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => { el.className = ''; }, 2500);
+  }
+
+  // ── Chapters ──
+  let currentChapters = [];
+
+  async function fetchChapters(videoId) {
+    currentChapters = [];
+    renderChapterMarkers([]);
+    renderChapterList([]);
+
+    if (!YOUTUBE_API_KEY) return;
+
+    try {
+      const res = await fetch(
+        `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoId}&key=${YOUTUBE_API_KEY}`
+      );
+      if (!res.ok) return;
+      const data = await res.json();
+      const description = data?.items?.[0]?.snippet?.description || '';
+      const chapters = parseChaptersFromDescription(description);
+      currentChapters = chapters;
+      renderChapterMarkers(chapters);
+      renderChapterList(chapters);
+    } catch (e) {
+      console.warn('Chapter fetch failed:', e);
+    }
+  }
+
+  function parseChaptersFromDescription(description) {
+    // Match lines like: "0:00 Intro", "1:23:45 - Chapter Name", "(12:34) Title"
+    const regex = /(?:^|\n)[^\d\n]*?(\d{1,2}:\d{2}(?::\d{2})?)\s*[-–—).]?\s*(.+)/g;
+    const chapters = [];
+    let match;
+    while ((match = regex.exec(description)) !== null) {
+      const timeParts = match[1].split(':').map(Number);
+      let sec = 0;
+      if (timeParts.length === 2) sec = timeParts[0] * 60 + timeParts[1];
+      else if (timeParts.length === 3) sec = timeParts[0] * 3600 + timeParts[1] * 60 + timeParts[2];
+      const title = match[2].trim().slice(0, 80);
+      if (title) chapters.push({ sec, title });
+    }
+    // Must have at least 2 entries and first must start near 0 to be real chapters
+    if (chapters.length < 2 || chapters[0].sec > 10) return [];
+    return chapters;
+  }
+
+  function renderChapterMarkers(chapters) {
+    const container = document.getElementById('chapterMarkers');
+    if (!container) return;
+    if (!chapters.length || !videoDuration) { container.innerHTML = ''; return; }
+    container.innerHTML = chapters.map(c => {
+      const pct = (c.sec / videoDuration) * 100;
+      return `<div class="chapter-marker" style="left:${pct}%" title="${escapeHtml(c.title)} — ${fmtTime(c.sec)}"></div>`;
+    }).join('');
+  }
+
+  function renderChapterList(chapters) {
+    const section = document.getElementById('chapterSection');
+    const list = document.getElementById('chapterList');
+    if (!section || !list) return;
+    if (!chapters.length) {
+      section.classList.remove('has-chapters');
+      return;
+    }
+    section.classList.add('has-chapters');
+    list.innerHTML = chapters.map((c, i) => `
+      <div class="chapter-pill" onclick="seekToChapter(${c.sec})">
+        <span class="chapter-pill-time">${fmtTime(c.sec)}</span>
+        <span class="chapter-pill-name">${escapeHtml(c.title)}</span>
+        <div class="chapter-pill-btns">
+          <button class="btn-set-a" onclick="event.stopPropagation(); setPointFromChapter('start', ${c.sec})">Set A</button>
+          <button class="btn-set-b" onclick="event.stopPropagation(); setPointFromChapter('end', ${c.sec})">Set B</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function seekToChapter(sec) {
+    if (!player) return;
+    player.seekTo(sec, true);
+  }
+
+  function setPointFromChapter(point, sec) {
+    if (point === 'start') {
+      startSec = Math.min(sec, endSec - 1);
+    } else {
+      endSec = Math.max(sec, startSec + 1);
+    }
+    updateSliders();
+    updateDisplays();
+    updateStatus();
+    showToast(point === 'start' ? `A set to ${fmtTime(sec)}` : `B set to ${fmtTime(sec)}`, 'success');
   }
 
   // ── Recent Videos (localStorage) ──
