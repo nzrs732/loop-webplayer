@@ -1,0 +1,1308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Loop Player</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f0f0f;
+      --surface: #1a1a1a;
+      --surface2: #242424;
+      --border: #2e2e2e;
+      --text: #e8e8e8;
+      --text-muted: #666;
+      --accent: #4f8ef7;
+      --accent-hover: #6ba3ff;
+      --danger: #e05555;
+      --success: #4caf7d;
+      --radius: 8px;
+    }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 14px;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 24px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      flex-shrink: 0;
+    }
+
+    .logo {
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      color: var(--text);
+    }
+    .logo span { color: var(--accent); }
+
+    .auth-area {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .auth-info {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    /* ── Buttons ── */
+    button {
+      cursor: pointer;
+      border: none;
+      border-radius: var(--radius);
+      font-size: 13px;
+      font-family: inherit;
+      transition: background 0.15s, color 0.15s, opacity 0.15s;
+    }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+      padding: 7px 14px;
+    }
+    .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--text-muted);
+      padding: 7px 14px;
+      border: 1px solid var(--border);
+    }
+    .btn-ghost:hover:not(:disabled) { color: var(--text); border-color: #555; }
+
+    .btn-icon {
+      background: var(--surface2);
+      color: var(--text);
+      padding: 5px 10px;
+      font-size: 12px;
+      border: 1px solid var(--border);
+    }
+    .btn-icon:hover:not(:disabled) { background: #2e2e2e; }
+
+    .btn-danger {
+      background: transparent;
+      color: var(--danger);
+      padding: 5px 10px;
+      font-size: 12px;
+      border: 1px solid transparent;
+    }
+    .btn-danger:hover:not(:disabled) { border-color: var(--danger); }
+
+    /* ── Layout ── */
+    .app {
+      display: flex;
+      flex: 1;
+      gap: 0;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 16px 24px;
+      gap: 12px;
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    .sidebar {
+      width: 280px;
+      border-left: 1px solid var(--border);
+      background: var(--surface);
+      display: flex;
+      flex-direction: column;
+      padding: 16px;
+      gap: 12px;
+      overflow: hidden;
+    }
+
+    /* ── URL Input ── */
+    .url-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      padding: 8px 12px;
+      font-size: 13px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    input[type="text"]:focus { border-color: var(--accent); }
+    input[type="text"]::placeholder { color: var(--text-muted); }
+
+    /* ── Player ── */
+    #playerContainer {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .player-wrapper {
+      background: #000;
+      border-radius: var(--radius);
+      overflow: hidden;
+      position: relative;
+      width: 100%;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .player-wrapper iframe {
+      width: 100%;
+      height: 100%;
+      display: block;
+      position: absolute;
+      inset: 0;
+    }
+
+    .player-placeholder {
+      width: 100%;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      color: var(--text-muted);
+      background: var(--surface);
+      border-radius: var(--radius);
+      border: 1px dashed var(--border);
+    }
+
+    .player-placeholder svg { opacity: 0.3; }
+
+    /* ── Loop Controls ── */
+    .loop-controls {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+
+    .loop-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .loop-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-muted);
+    }
+
+    .loop-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    /* Toggle switch */
+    .switch {
+      position: relative;
+      width: 34px;
+      height: 18px;
+    }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .switch-track {
+      position: absolute;
+      inset: 0;
+      background: var(--border);
+      border-radius: 9px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .switch-track::after {
+      content: '';
+      position: absolute;
+      top: 2px; left: 2px;
+      width: 14px; height: 14px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform 0.2s;
+    }
+    .switch input:checked + .switch-track { background: var(--accent); }
+    .switch input:checked + .switch-track::after { transform: translateX(16px); }
+
+    /* ── Timeline ── */
+    .timeline-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .timeline {
+      position: relative;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      cursor: default;
+    }
+
+    .tl-track-bg {
+      position: absolute;
+      left: 0; right: 0;
+      height: 6px;
+      background: var(--surface2);
+      border-radius: 3px;
+      border: 1px solid var(--border);
+    }
+
+    .tl-track-fill {
+      position: absolute;
+      height: 6px;
+      background: var(--accent);
+      opacity: 0.35;
+      border-radius: 3px;
+      pointer-events: none;
+    }
+
+    .tl-playhead {
+      position: absolute;
+      width: 2px;
+      height: 28px;
+      background: #fff;
+      opacity: 0.7;
+      border-radius: 1px;
+      pointer-events: none;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      left: 0%;
+      transition: left 0.1s linear;
+    }
+
+    /* Range inputs overlaid on timeline */
+    .timeline input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      background: transparent;
+      outline: none;
+      cursor: pointer;
+      pointer-events: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .timeline input[type="range"]::-webkit-slider-runnable-track {
+      background: transparent;
+      height: 6px;
+    }
+
+    .timeline input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      pointer-events: all;
+      width: 14px;
+      height: 28px;
+      border-radius: 4px;
+      background: var(--accent);
+      border: 2px solid #fff;
+      cursor: ew-resize;
+      transition: background 0.1s, transform 0.1s;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.5);
+    }
+
+    .timeline input[type="range"]::-webkit-slider-thumb:hover {
+      background: var(--accent-hover);
+      transform: scaleY(1.08);
+    }
+
+    .timeline input[type="range"]::-moz-range-track {
+      background: transparent;
+      height: 6px;
+    }
+
+    .timeline input[type="range"]::-moz-range-thumb {
+      width: 14px;
+      height: 28px;
+      border-radius: 4px;
+      background: var(--accent);
+      border: 2px solid #fff;
+      cursor: ew-resize;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.5);
+    }
+
+    .tl-time-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      color: var(--text-muted);
+      font-variant-numeric: tabular-nums;
+      padding: 0 1px;
+    }
+
+    /* ── Loop point cards ── */
+    .loop-points {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .loop-point {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .loop-point-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .point-label {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+    }
+
+    .point-label.start { color: #4caf7d; }
+    .point-label.end   { color: #e07b55; }
+
+    .point-time {
+      font-size: 20px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      color: var(--text);
+      letter-spacing: -0.01em;
+      line-height: 1;
+    }
+
+    .point-btn-row {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+    }
+
+    .point-btn-row button {
+      flex: 1;
+      padding: 4px 0;
+      font-size: 11px;
+      background: var(--surface);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      text-align: center;
+    }
+
+    .point-btn-row button:hover:not(:disabled) {
+      color: var(--text);
+      border-color: #555;
+      background: #2a2a2a;
+    }
+
+    .point-btn-row .btn-set {
+      background: transparent;
+      color: var(--accent);
+      border-color: var(--accent);
+      opacity: 0.75;
+      flex: 1.4;
+    }
+
+    .point-btn-row .btn-set:hover:not(:disabled) {
+      opacity: 1;
+      background: rgba(79,142,247,0.1);
+    }
+
+    .loop-point-arrow {
+      font-size: 16px;
+      color: var(--text-muted);
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    /* ── Status bar ── */
+
+    /* ── Status bar ── */
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--text-muted);
+    }
+    .status-dot.active { background: var(--success); }
+
+    /* ── Sidebar ── */
+    .sidebar-title {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+    }
+
+    .save-row {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .sessions-list {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-height: 0;
+    }
+
+    .sessions-list::-webkit-scrollbar { width: 4px; }
+    .sessions-list::-webkit-scrollbar-track { background: transparent; }
+    .sessions-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .session-item {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 12px;
+      cursor: pointer;
+      transition: border-color 0.15s;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .session-item:hover { border-color: var(--accent); }
+    .session-item.active { border-color: var(--accent); background: #1a2540; }
+
+    .session-name {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .session-meta {
+      font-size: 11px;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .session-actions {
+      display: flex;
+      gap: 4px;
+      margin-top: 4px;
+    }
+
+    .empty-state {
+      color: var(--text-muted);
+      font-size: 12px;
+      text-align: center;
+      padding: 24px 0;
+    }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 10px 18px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      z-index: 9999;
+      transition: transform 0.25s ease;
+      pointer-events: none;
+    }
+    #toast.show { transform: translateX(-50%) translateY(0); }
+    #toast.success { border-color: var(--success); color: var(--success); }
+    #toast.error { border-color: var(--danger); color: var(--danger); }
+
+    /* ── Recent Videos ── */
+    .recent-list {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      overflow-y: auto;
+      max-height: 200px;
+      min-height: 0;
+    }
+
+    .recent-list::-webkit-scrollbar { width: 4px; }
+    .recent-list::-webkit-scrollbar-track { background: transparent; }
+    .recent-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .recent-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 8px;
+      cursor: pointer;
+      transition: border-color 0.15s;
+      overflow: hidden;
+    }
+
+    .recent-item:hover { border-color: var(--accent); }
+    .recent-item.playing { border-color: var(--accent); background: #1a2540; }
+
+    .recent-thumb {
+      width: 52px;
+      height: 34px;
+      border-radius: 3px;
+      object-fit: cover;
+      flex-shrink: 0;
+      background: var(--border);
+    }
+
+    .recent-info {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .recent-title {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      line-height: 1.3;
+    }
+
+    .recent-remove {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 13px;
+      padding: 2px 4px;
+      border-radius: 3px;
+      flex-shrink: 0;
+      line-height: 1;
+      opacity: 0.5;
+    }
+    .recent-remove:hover { opacity: 1; color: var(--danger); }
+
+    /* ── Divider ── */
+    .divider {
+      height: 1px;
+      background: var(--border);
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">loop<span>.</span>player</div>
+  <div class="auth-area">
+    <span class="auth-info" id="authInfo">Guest</span>
+    <button class="btn-ghost" id="authBtn" onclick="handleAuth()">Sign in with Google</button>
+  </div>
+</header>
+
+<div class="app">
+  <!-- Main content -->
+  <div class="main">
+
+    <!-- URL input -->
+    <div class="url-row">
+      <input type="text" id="urlInput" placeholder="Paste YouTube URL…" />
+      <button class="btn-primary" onclick="loadVideo()">Load</button>
+    </div>
+
+    <!-- Player -->
+    <div id="playerContainer">
+      <div class="player-placeholder" id="playerPlaceholder">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M8 5v14l11-7z"/>
+        </svg>
+        <span>Paste a YouTube URL to get started</span>
+      </div>
+    </div>
+
+    <!-- Loop Controls -->
+    <div class="loop-controls" id="loopControls">
+      <div class="loop-header">
+        <span class="loop-title">Loop Region</span>
+        <label class="loop-toggle">
+          <span id="loopToggleLabel">Loop on</span>
+          <label class="switch">
+            <input type="checkbox" id="loopToggle" checked onchange="updateLoopToggle()">
+            <span class="switch-track"></span>
+          </label>
+        </label>
+      </div>
+
+      <!-- Timeline -->
+      <div class="timeline-wrap">
+        <div class="timeline" id="timeline">
+          <div class="tl-track-bg"></div>
+          <div class="tl-track-fill" id="trackFill"></div>
+          <div class="tl-playhead" id="playhead"></div>
+          <input type="range" id="startSlider" min="0" max="100" value="0" step="0.1"
+                 oninput="onStartSlide()" />
+          <input type="range" id="endSlider" min="0" max="100" value="100" step="0.1"
+                 oninput="onEndSlide()" />
+        </div>
+        <div class="tl-time-labels">
+          <span id="tlStart">0:00</span>
+          <span id="tlDuration">—</span>
+        </div>
+      </div>
+
+      <!-- Start / End cards -->
+      <div class="loop-points">
+        <div class="loop-point">
+          <div class="loop-point-header">
+            <span class="point-label start">Start</span>
+          </div>
+          <span class="point-time" id="startDisplay">0:00</span>
+          <div class="point-btn-row">
+            <button onclick="adjustTime('start', -1)">−1s</button>
+            <button class="btn-set" onclick="setPointFromCurrent('start')">Set here</button>
+            <button onclick="adjustTime('start', 1)">+1s</button>
+          </div>
+        </div>
+
+        <div class="loop-point-arrow">→</div>
+
+        <div class="loop-point">
+          <div class="loop-point-header">
+            <span class="point-label end">End</span>
+          </div>
+          <span class="point-time" id="endDisplay">0:00</span>
+          <div class="point-btn-row">
+            <button onclick="adjustTime('end', -1)">−1s</button>
+            <button class="btn-set" onclick="setPointFromCurrent('end')">Set here</button>
+            <button onclick="adjustTime('end', 1)">+1s</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Status -->
+      <div class="status-bar">
+        <div class="status-dot" id="statusDot"></div>
+        <span id="statusText">No video loaded</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Sidebar -->
+  <div class="sidebar">
+
+    <!-- Recent Videos -->
+    <span class="sidebar-title">Recent Videos</span>
+    <div class="recent-list" id="recentList">
+      <div class="empty-state" id="recentEmpty">No videos loaded yet</div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Sessions -->
+    <span class="sidebar-title">Sessions</span>
+
+    <div class="save-row">
+      <input type="text" id="sessionNameInput" placeholder="Session name…" />
+      <button class="btn-primary" onclick="saveSession()">Save current</button>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="sessions-list" id="sessionsList">
+      <div class="empty-state" id="emptyState">No saved sessions yet</div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- YouTube IFrame API -->
+<script src="https://www.youtube.com/iframe_api"></script>
+
+<!-- Firebase SDK -->
+<script type="module">
+  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+  import {
+    getAuth, signInAnonymously, signInWithPopup,
+    GoogleAuthProvider, onAuthStateChanged, signOut
+  } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+  import {
+    getFirestore, collection, addDoc, getDocs,
+    deleteDoc, doc, query, where, serverTimestamp
+  } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+  // ─────────────────────────────────────────────
+  // 🔧 REPLACE WITH YOUR FIREBASE CONFIG
+  // ─────────────────────────────────────────────
+  const firebaseConfig = {
+    apiKey: "AIzaSyCdRJdHuHoImpJZKEQBD7mdDw4nKUcX_EU",
+    authDomain: "loop-webplayer.firebaseapp.com",
+    projectId: "loop-webplayer",
+    storageBucket: "loop-webplayer.firebasestorage.app",
+    messagingSenderId: "421050342301",
+    appId: "1:421050342301:web:c1a31bf4b809e001566d74",
+    measurementId: "G-2Y3HCD64PD"
+  };
+  // ─────────────────────────────────────────────
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+  const googleProvider = new GoogleAuthProvider();
+
+  let currentUser = null;
+
+  // Sign in anonymously on load
+  signInAnonymously(auth).catch(err => console.warn('Anonymous sign-in failed:', err));
+
+  onAuthStateChanged(auth, user => {
+    currentUser = user;
+    const authInfo = document.getElementById('authInfo');
+    const authBtn = document.getElementById('authBtn');
+    if (user) {
+      if (user.isAnonymous) {
+        authInfo.textContent = 'Guest';
+        authBtn.textContent = 'Sign in with Google';
+      } else {
+        authInfo.textContent = user.displayName || user.email;
+        authBtn.textContent = 'Sign out';
+      }
+      loadSessions();
+    }
+  });
+
+  // Expose to window for onclick handlers
+  window._firebaseHandleAuth = async () => {
+    if (!currentUser) return;
+    if (currentUser.isAnonymous) {
+      try {
+        await signInWithPopup(auth, googleProvider);
+        showToast('Signed in!', 'success');
+      } catch (e) {
+        showToast('Sign-in failed', 'error');
+      }
+    } else {
+      await signOut(auth);
+      await signInAnonymously(auth);
+      showToast('Signed out');
+    }
+  };
+
+  window._firebaseSaveSession = async (name, videoId, startSec, endSec) => {
+    if (!currentUser) return;
+    try {
+      await addDoc(collection(db, 'sessions'), {
+        uid: currentUser.uid,
+        name,
+        videoId,
+        startSec,
+        endSec,
+        createdAt: serverTimestamp()
+      });
+      showToast('Session saved!', 'success');
+      loadSessions();
+    } catch (e) {
+      console.error(e);
+      showToast('Failed to save', 'error');
+    }
+  };
+
+  window._firebaseDeleteSession = async (id) => {
+    try {
+      await deleteDoc(doc(db, 'sessions', id));
+      loadSessions();
+    } catch (e) {
+      showToast('Failed to delete', 'error');
+    }
+  };
+
+  async function loadSessions() {
+    if (!currentUser) return;
+    const q = query(
+      collection(db, 'sessions'),
+      where('uid', '==', currentUser.uid)
+    );
+    try {
+      const snap = await getDocs(q);
+      const sessions = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
+      renderSessions(sessions);
+    } catch (e) {
+      console.warn('Load sessions error:', e);
+    }
+  }
+
+  function renderSessions(sessions) {
+    const list = document.getElementById('sessionsList');
+    const empty = document.getElementById('emptyState');
+    if (sessions.length === 0) {
+      list.innerHTML = '';
+      list.appendChild(empty);
+      empty.style.display = 'block';
+      return;
+    }
+    empty.style.display = 'none';
+    list.innerHTML = sessions.map(s => `
+      <div class="session-item" onclick="loadSession('${s.videoId}', ${s.startSec}, ${s.endSec})">
+        <div class="session-name">${escapeHtml(s.name)}</div>
+        <div class="session-meta">
+          <span>${fmtTime(s.startSec)} → ${fmtTime(s.endSec)}</span>
+          <button class="btn-danger" onclick="event.stopPropagation(); deleteSession('${s.id}')">✕</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  window._firebaseLoadSessions = loadSessions;
+</script>
+
+<script>
+  // ── State ──
+  let player = null;
+  let videoDuration = 0;
+  let startSec = 0;
+  let endSec = 0;
+  let loopEnabled = true;
+  let loopInterval = null;
+  let currentVideoId = null;
+  let ytApiReady = false;
+  let pendingLoad = null; // { videoId, startSec } queued before API ready
+
+  // ── YouTube API ──
+  function onYouTubeIframeAPIReady() {
+    ytApiReady = true;
+    if (pendingLoad) {
+      const { videoId, startAt } = pendingLoad;
+      pendingLoad = null;
+      _createPlayer(videoId, startAt);
+    }
+  }
+
+  function _ensurePlayerDiv() {
+    document.getElementById('playerPlaceholder')?.remove();
+    if (!document.getElementById('ytPlayer')) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'player-wrapper';
+      const inner = document.createElement('div');
+      inner.id = 'ytPlayer';
+      wrapper.appendChild(inner);
+      document.getElementById('playerContainer').appendChild(wrapper);
+    }
+  }
+
+  function _createPlayer(videoId, startAt = 0) {
+    player = new YT.Player('ytPlayer', {
+      videoId,
+      playerVars: { autoplay: 1, controls: 1, rel: 0, start: Math.floor(startAt) },
+      events: {
+        onReady: onPlayerReady,
+        onStateChange: onPlayerStateChange
+      }
+    });
+  }
+
+  function extractVideoId(url) {
+    const patterns = [
+      /(?:v=|\/embed\/|youtu\.be\/|\/v\/|\/watch\?v=)([a-zA-Z0-9_-]{11})/,
+    ];
+    for (const p of patterns) {
+      const m = url.match(p);
+      if (m) return m[1];
+    }
+    return null;
+  }
+
+  function loadVideo() {
+    const url = document.getElementById('urlInput').value.trim();
+    const videoId = extractVideoId(url);
+    if (!videoId) {
+      showToast('Invalid YouTube URL', 'error');
+      return;
+    }
+    currentVideoId = videoId;
+    _ensurePlayerDiv();
+
+    pushRecent(videoId);
+
+    if (!ytApiReady) {
+      pendingLoad = { videoId, startAt: 0 };
+      return;
+    }
+
+    if (player) {
+      player.loadVideoById(videoId);
+    } else {
+      _createPlayer(videoId);
+    }
+    renderRecent();
+  }
+
+  function onPlayerReady(e) {
+    videoDuration = player.getDuration();
+    // Only reset loop points if they haven't been set by loadSession
+    if (startSec === 0 && endSec === 0) {
+      startSec = 0;
+      endSec = videoDuration;
+    } else if (endSec === 0) {
+      endSec = videoDuration;
+    }
+    updateSliders();
+    updateDisplays();
+    updateStatus();
+    startLoopWatcher();
+  }
+
+  function onPlayerStateChange(e) {
+    if (e.data === YT.PlayerState.ENDED) {
+      if (loopEnabled) {
+        player.seekTo(startSec, true);
+        player.playVideo();
+      }
+    }
+  }
+
+  function startLoopWatcher() {
+    clearInterval(loopInterval);
+    loopInterval = setInterval(() => {
+      if (!player || !loopEnabled) return;
+      const state = player.getPlayerState();
+      if (state === YT.PlayerState.PLAYING) {
+        const t = player.getCurrentTime();
+        if (t >= endSec) {
+          player.seekTo(startSec, true);
+        }
+      }
+    }, 300);
+    startPlayheadRAF();
+  }
+
+  let rafId = null;
+  function startPlayheadRAF() {
+    if (rafId) cancelAnimationFrame(rafId);
+    function frame() {
+      if (player && videoDuration > 0) {
+        try {
+          const t = player.getCurrentTime();
+          const pct = (t / videoDuration) * 100;
+          const ph = document.getElementById('playhead');
+          if (ph) ph.style.left = pct + '%';
+        } catch(e) {}
+      }
+      rafId = requestAnimationFrame(frame);
+    }
+    rafId = requestAnimationFrame(frame);
+  }
+
+  // ── Sliders ──
+  function onStartSlide() {
+    const slider = document.getElementById('startSlider');
+    const endSlider = document.getElementById('endSlider');
+    let val = parseFloat(slider.value);
+    const endVal = parseFloat(endSlider.value);
+    if (val >= endVal - 0.5) {
+      val = endVal - 0.5;
+      slider.value = val;
+    }
+    startSec = (val / 100) * videoDuration;
+    updateDisplays();
+    updateTrackFill();
+  }
+
+  function onEndSlide() {
+    const slider = document.getElementById('endSlider');
+    const startSlider = document.getElementById('startSlider');
+    let val = parseFloat(slider.value);
+    const startVal = parseFloat(startSlider.value);
+    if (val <= startVal + 0.5) {
+      val = startVal + 0.5;
+      slider.value = val;
+    }
+    endSec = (val / 100) * videoDuration;
+    updateDisplays();
+    updateTrackFill();
+  }
+
+  function updateSliders() {
+    if (!videoDuration) return;
+    document.getElementById('startSlider').value = (startSec / videoDuration) * 100;
+    document.getElementById('endSlider').value = (endSec / videoDuration) * 100;
+    updateTrackFill();
+  }
+
+  function updateTrackFill() {
+    const startPct = parseFloat(document.getElementById('startSlider').value);
+    const endPct = parseFloat(document.getElementById('endSlider').value);
+    const fill = document.getElementById('trackFill');
+    fill.style.left = startPct + '%';
+    fill.style.width = (endPct - startPct) + '%';
+    // update timeline edge labels
+    const tlStart = document.getElementById('tlStart');
+    const tlDur = document.getElementById('tlDuration');
+    if (tlStart) tlStart.textContent = fmtTime(startSec);
+    if (tlDur) tlDur.textContent = videoDuration > 0 ? fmtTime(videoDuration) : '—';
+  }
+
+  function adjustTime(point, delta) {
+    if (!videoDuration) return;
+    if (point === 'start') {
+      startSec = Math.max(0, Math.min(startSec + delta, endSec - 1));
+    } else {
+      endSec = Math.max(startSec + 1, Math.min(endSec + delta, videoDuration));
+    }
+    updateSliders();
+    updateDisplays();
+  }
+
+  function setPointFromCurrent(point) {
+    if (!player) return;
+    const t = player.getCurrentTime();
+    if (point === 'start') {
+      startSec = Math.min(t, endSec - 1);
+    } else {
+      endSec = Math.max(t, startSec + 1);
+    }
+    updateSliders();
+    updateDisplays();
+  }
+
+  function updateDisplays() {
+    document.getElementById('startDisplay').textContent = fmtTime(startSec);
+    document.getElementById('endDisplay').textContent = fmtTime(endSec);
+  }
+
+  function updateLoopToggle() {
+    loopEnabled = document.getElementById('loopToggle').checked;
+    document.getElementById('loopToggleLabel').textContent = loopEnabled ? 'Loop on' : 'Loop off';
+    updateStatus();
+  }
+
+  function updateStatus() {
+    const dot = document.getElementById('statusDot');
+    const text = document.getElementById('statusText');
+    if (!currentVideoId) {
+      dot.className = 'status-dot';
+      text.textContent = 'No video loaded';
+    } else if (loopEnabled) {
+      dot.className = 'status-dot active';
+      const dur = endSec - startSec;
+      text.textContent = `Looping ${fmtTime(startSec)} → ${fmtTime(endSec)}  (${fmtTime(dur)})`;
+    } else {
+      dot.className = 'status-dot';
+      text.textContent = 'Loop disabled';
+    }
+  }
+
+  // ── Sessions ──
+  function saveSession() {
+    const name = document.getElementById('sessionNameInput').value.trim();
+    if (!name) { showToast('Enter a session name', 'error'); return; }
+    if (!currentVideoId) { showToast('No video loaded', 'error'); return; }
+    window._firebaseSaveSession?.(name, currentVideoId, startSec, endSec);
+    document.getElementById('sessionNameInput').value = '';
+  }
+
+  function loadSession(videoId, start, end) {
+    currentVideoId = videoId;
+    startSec = start;
+    endSec = end;
+
+    document.getElementById('urlInput').value = `https://www.youtube.com/watch?v=${videoId}`;
+    _ensurePlayerDiv();
+    pushRecent(videoId);
+
+    if (!ytApiReady) {
+      pendingLoad = { videoId, startAt: start };
+      return;
+    }
+
+    if (player) {
+      player.loadVideoById(videoId, start);
+      videoDuration = 0;
+      waitForDuration();
+    } else {
+      _createPlayer(videoId, start);
+    }
+  }
+
+  function waitForDuration() {
+    const t = setInterval(() => {
+      const d = player.getDuration();
+      if (d > 0) {
+        videoDuration = d;
+        updateSliders();
+        updateDisplays();
+        updateStatus();
+        startLoopWatcher();
+        clearInterval(t);
+      }
+    }, 200);
+  }
+
+  function deleteSession(id) {
+    window._firebaseDeleteSession?.(id);
+  }
+
+  // ── Auth ──
+  function handleAuth() {
+    window._firebaseHandleAuth?.();
+  }
+
+  // ── Helpers ──
+  function fmtTime(sec) {
+    if (!sec && sec !== 0) return '0:00';
+    const s = Math.floor(sec);
+    const m = Math.floor(s / 60);
+    const ss = String(s % 60).padStart(2, '0');
+    const h = Math.floor(m / 60);
+    if (h > 0) return `${h}:${String(m % 60).padStart(2, '0')}:${ss}`;
+    return `${m}:${ss}`;
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  let toastTimer;
+  function showToast(msg, type = '') {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = 'show ' + type;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { el.className = ''; }, 2500);
+  }
+
+  // ── Recent Videos (localStorage) ──
+  const RECENT_KEY = 'loop_player_recent';
+  const MAX_RECENT = 8;
+
+  function getRecent() {
+    try { return JSON.parse(localStorage.getItem(RECENT_KEY) || '[]'); }
+    catch { return []; }
+  }
+
+  function saveRecent(list) {
+    localStorage.setItem(RECENT_KEY, JSON.stringify(list));
+  }
+
+  async function pushRecent(videoId) {
+    let list = getRecent().filter(r => r.videoId !== videoId);
+    // fetch title via oEmbed (no API key needed)
+    let title = videoId;
+    try {
+      const res = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`);
+      if (res.ok) {
+        const data = await res.json();
+        title = data.title || videoId;
+      }
+    } catch {}
+    list.unshift({ videoId, title, addedAt: Date.now() });
+    if (list.length > MAX_RECENT) list = list.slice(0, MAX_RECENT);
+    saveRecent(list);
+    renderRecent();
+  }
+
+  function removeRecent(videoId) {
+    saveRecent(getRecent().filter(r => r.videoId !== videoId));
+    renderRecent();
+  }
+
+  function renderRecent() {
+    const list = getRecent();
+    const el = document.getElementById('recentList');
+    const empty = document.getElementById('recentEmpty');
+    if (list.length === 0) {
+      el.innerHTML = '';
+      el.appendChild(empty);
+      return;
+    }
+    el.innerHTML = list.map(r => `
+      <div class="recent-item${currentVideoId === r.videoId ? ' playing' : ''}"
+           onclick="loadRecentVideo('${r.videoId}')">
+        <img class="recent-thumb"
+             src="https://img.youtube.com/vi/${r.videoId}/mqdefault.jpg"
+             alt="" loading="lazy" />
+        <div class="recent-info">
+          <span class="recent-title" title="${escapeHtml(r.title)}">${escapeHtml(r.title)}</span>
+        </div>
+        <button class="recent-remove" title="Remove"
+                onclick="event.stopPropagation(); removeRecent('${r.videoId}')">✕</button>
+      </div>
+    `).join('');
+  }
+
+  function loadRecentVideo(videoId) {
+    document.getElementById('urlInput').value = `https://www.youtube.com/watch?v=${videoId}`;
+    loadVideo();
+  }
+
+  // Init recent list on page load
+  renderRecent();
+
+  // Init track fill
+  updateTrackFill();
+</script>
+
+</body>
+</html>
